@@ -119,9 +119,18 @@ public class SerialConnection : MonoBehaviour
         }
     }
 
-    void Start() {
-        if (autoCycle) {
+    void Start()
+    {
+        if (autoCycle)
+        {
             Debug.Log("UGS: If Auto Cycle is enabled, the port will close and attempt to re-open whenever a propery is changed through a script. If a property is changed in inspector, the port must be cycled manually.");
+        }
+    }
+
+    public void Flush() {
+        if (_serialPort != null) {
+            _serialPort.DiscardOutBuffer();
+            _serialPort.DiscardInBuffer();
         }
     }
 
@@ -165,7 +174,7 @@ public class SerialConnection : MonoBehaviour
     {
         string formattedPort = _portName;
 
-#if UNITY_STANDALONE_WIN
+#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
         formattedPort = "\\\\\\\\.\\\\" + _portName;
 #endif
         Debug.Log("UGS: Opening port: " + formattedPort);
@@ -232,6 +241,7 @@ public class SerialConnection : MonoBehaviour
 
     public void Write(byte[] data)
     {
+        Debug.Log("writing: " + (char)data[0]);
         if (_serialPort != null && _serialPort.IsOpen)
         {
             try
@@ -243,6 +253,29 @@ public class SerialConnection : MonoBehaviour
                 Debug.LogError("UGS: Write timed out");
             }
         }
+    }
+
+    public void WriteLine(string s)
+    {
+        
+        if (_serialPort != null && _serialPort.IsOpen)
+        {
+            try
+            {
+                Debug.Log("Sending: " + s);
+                _serialPort.WriteLine(s);
+            }
+            catch (TimeoutException)
+            {
+                Debug.LogError("UGS: Write timed out");
+            }
+        }
+
+    }
+
+    void OnApplicationQuit()
+    {
+        Close();
     }
 
     public void Close()
