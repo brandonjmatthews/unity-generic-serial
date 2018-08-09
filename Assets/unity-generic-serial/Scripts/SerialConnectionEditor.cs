@@ -4,43 +4,46 @@ Unity Generic Serial Controller
 Author: Brandon Matthews
 2018
  */
- 
+
 using UnityEngine;
 using System.Collections;
 using UnityEditor;
 
-[CustomEditor(typeof(SerialConnection))]
-public class SerialConnectionEditor : Editor
+namespace UGS
 {
-    public override void OnInspectorGUI()
-    { 
-        
-        EditorGUILayout.Space();
-        EditorGUILayout.Space();
-        
-        SerialConnection serialConn = (SerialConnection)target;
-        
-        if (serialConn.isOpen)
+    [CustomEditor(typeof(SerialConnection))]
+    public class SerialConnectionEditor : Editor
+    {
+        public override void OnInspectorGUI()
         {
-            if (GUILayout.Button("Close Port"))
+
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();
+
+            SerialConnection serialConn = (SerialConnection)target;
+
+            if (serialConn.isOpen)
             {
-                serialConn.Close();
+                if (GUILayout.Button("Close Port"))
+                {
+                    serialConn.Close();
+                }
             }
-        }
-        else
-        {
-            if (GUILayout.Button("Open Port"))
+            else
             {
-                serialConn.Open();
+                if (GUILayout.Button("Open Port"))
+                {
+                    serialConn.Open();
+                }
+
             }
 
+            EditorGUILayout.Space();
+            EditorGUILayout.Space();
+
+            DrawDefaultInspector();
+
+
         }
-
-        EditorGUILayout.Space();
-        EditorGUILayout.Space();
-
-        DrawDefaultInspector();
- 
-       
     }
 }
