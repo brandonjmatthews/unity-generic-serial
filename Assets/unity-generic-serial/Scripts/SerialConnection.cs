@@ -33,7 +33,7 @@ namespace UGS
         public int _dataBits = 8;
         public StopBits _stopBits = StopBits.One;
         public Parity _parity = Parity.None;
-        public Handshake _handshape = Handshake.RequestToSend;
+        public Handshake _handshake = Handshake.RequestToSend;
 
         public WaitFor waitFor = WaitFor.EndOfFrame;
         public bool autoCycle = true;
@@ -47,8 +47,6 @@ namespace UGS
 
         int _readTimeout = 200;
         int _writeTimeout = 2000;
-
-        bool _started = false;
         string _availableSerialPorts;
         SerialPort _serialPort;
 
@@ -58,13 +56,7 @@ namespace UGS
 
         List<int> readLineBuffer = new List<int>();
 
-        public bool isOpen
-        {
-            get
-            {
-                return _started;
-            }
-        }
+        public bool isOpen { get; private set; } = false;
 
         public string portName
         {
@@ -80,7 +72,7 @@ namespace UGS
                     _serialPort.PortName = _portName;
                 }
 
-                if (autoCycle) Cycle(_maxOpenAttempts);
+                if (autoCycle) Cycle();
             }
         }
 
@@ -98,7 +90,7 @@ namespace UGS
                     _serialPort.BaudRate = _baudRate;
                 }
 
-                if (autoCycle) Cycle(_maxOpenAttempts);
+                if (autoCycle) Cycle();
             }
         }
 
@@ -116,7 +108,7 @@ namespace UGS
                     _serialPort.DataBits = _dataBits;
                 }
 
-                if (autoCycle) Cycle(_maxOpenAttempts);
+                if (autoCycle) Cycle();
             }
         }
 
@@ -134,7 +126,7 @@ namespace UGS
                     _serialPort.StopBits = _stopBits;
                 }
 
-                if (autoCycle) Cycle(_maxOpenAttempts);
+                if (autoCycle) Cycle();
             }
         }
 
@@ -151,7 +143,7 @@ namespace UGS
                 {
                     _serialPort.Parity = _parity;
                 }
-                if (autoCycle) Cycle(_maxOpenAttempts);
+                if (autoCycle) Cycle();
             }
         }
 
@@ -161,6 +153,10 @@ namespace UGS
             {
                 Debug.Log("UGS: If Auto Cycle is enabled, the port will close and attempt to re-open whenever a propery is changed through a script. If a property is changed in inspector, the port must be cycled manually.");
             }
+
+
+
+            Debug.Log("Available serial ports: " + string.Join(",", SerialPort.GetPortNames()));
         }
 
         public void Flush()
@@ -172,39 +168,27 @@ namespace UGS
             }
         }
 
-        public bool Open(int attempts = 0)
+        public bool Open()
         {
-            if (attempts < _maxOpenAttempts)
+            // Don't try to open a port if this Connection is already open
+            if (isOpen) return false;
+
+            try
             {
-                if (_serialPort != null)
-                {
-                    _serialPort = null;
-                    return Open(attempts);
-                }
-                else
-                {
-                    try
-                    {
-                        CreateSerialPort();
-                        _serialPort.Open();
-                        _serialPort.ReadTimeout = _readTimeout;
-                        _serialPort.WriteTimeout = _writeTimeout;
-                        _started = true;
-                        onSerialOpen.Invoke();
-                        readRoutine = StartCoroutine(Read());
-                        return true;
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogErrorFormat("UGS: Failed to Open Port, Attempts remaining: {0}", _maxOpenAttempts - (attempts + 1));
-                        Debug.LogError(e.Message);
-                        return Open(attempts + 1);
-                    }
-                }
+                CreateSerialPort();
+                _serialPort.Open();
+                _serialPort.ReadTimeout = _readTimeout;
+                _serialPort.WriteTimeout = _writeTimeout;
+                isOpen = true;
+                readRoutine = StartCoroutine(Read());
+                onSerialOpen.Invoke();
+                return true;
             }
-            else
+            catch (Exception e)
             {
-                Debug.LogErrorFormat("UGS: Port failed to open after {0} attempts", _maxOpenAttempts);
+                Debug.LogErrorFormat("UGS: Failed to Open Port");
+                Debug.LogError(e.Message);
+                isOpen = false;
                 return false;
             }
         }
@@ -233,7 +217,8 @@ namespace UGS
 
         public IEnumerator Read()
         {
-            while (_started)
+
+            while (isOpen)
             {
                 try
                 {
@@ -279,7 +264,6 @@ namespace UGS
                 {
                     Debug.LogError("UGS: The port is not open");
                 }
-
 
                 if (waitFor == WaitFor.EndOfFrame)
                 {
@@ -345,20 +329,21 @@ namespace UGS
                 StopCoroutine(readRoutine);
                 _serialPort.Close();
                 _serialPort = null;
-                _started = false;
+                isOpen = false;
                 onSerialClose.Invoke();
             }
         }
 
-        public void Cycle(int attempts = 0)
+        public void Cycle()
         {
             if (_serialPort != null && _serialPort.IsOpen)
             {
                 Close();
                 _serialPort = null;
-                Open(attempts);
+                Open();
             }
         }
+
     }
 
 }
