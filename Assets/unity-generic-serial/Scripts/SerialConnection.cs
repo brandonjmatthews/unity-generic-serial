@@ -43,14 +43,13 @@ namespace UGS
         public SerialDataEvent onLineRecieved;
         public SerialOpenEvent onSerialOpen;
         public SerialCloseEvent onSerialClose;
+        public string inputLine;
 
 
         int _readTimeout = 200;
         int _writeTimeout = 2000;
         string _availableSerialPorts;
         SerialPort _serialPort;
-
-        int _maxOpenAttempts = 5;
 
         Coroutine readRoutine;
 
@@ -159,6 +158,10 @@ namespace UGS
             Debug.Log("Available serial ports: " + string.Join(",", SerialPort.GetPortNames()));
         }
 
+        private void Update() {
+
+        }
+
         public void Flush()
         {
             if (_serialPort != null)
@@ -223,7 +226,7 @@ namespace UGS
                 try
                 {
                     string data = "";
-                    if (_serialPort.BytesToRead > 0)
+                    while (_serialPort.BytesToRead > 0)
                     {
                         int b = _serialPort.ReadByte();
                         char c = (char)b;
@@ -243,6 +246,7 @@ namespace UGS
                                 }
                                 readLineBuffer = new List<int>();
                                 onLineRecieved.Invoke(line);
+                                inputLine = line;
                             }
                         }
                         else
