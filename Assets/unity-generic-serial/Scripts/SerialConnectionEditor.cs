@@ -5,11 +5,13 @@ Author: Brandon Matthews
 2018
  */
 
+#if UNITY_EDITOR && UNITY_STANDALONE_WIN
 using UnityEngine;
 using System.Collections;
+
 using UnityEditor;
 
-namespace UGS
+namespace Connectivity
 {
     [CustomEditor(typeof(SerialConnection))]
     public class SerialConnectionEditor : Editor
@@ -47,3 +49,4 @@ namespace UGS
         }
     }
 }
+#endif

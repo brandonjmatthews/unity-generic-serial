@@ -1,4 +1,6 @@
-﻿/**
+﻿#define CONNECTIVITY_SERIAL
+
+/**
 Unity Generic Serial Controller
 
 Author: Brandon Matthews
@@ -7,27 +9,18 @@ Author: Brandon Matthews
 Main serial controller, data can be read easily through UnityEvents.!--
 No parsing is done in the controller, this should be handled by the event listeners.
  */
-
+#if UNITY_STANDALONE_WIN || UNITY_STANDALONE_OSX
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO.Ports;
+using System.Text;
 using UnityEngine;
 
-
-namespace UGS
+namespace Connectivity
 {
-    [Serializable]
-    public enum WaitFor
+    public class SerialConnection : Connection
     {
-        EndOfFrame,
-        DataAvailable,
-    }
-
-
-    public class SerialConnection : MonoBehaviour
-    {
-
         public string _portName = "COM1";
         public int _baudRate = 9600;
         public int _dataBits = 8;
@@ -35,27 +28,12 @@ namespace UGS
         public Parity _parity = Parity.None;
         public Handshake _handshake = Handshake.RequestToSend;
 
-        public WaitFor waitFor = WaitFor.EndOfFrame;
-        public bool autoCycle = true;
-
-        public SerialCharEvent onByteRecieved;
-        public SerialDataEvent onDataRecieved;
-        public SerialDataEvent onLineRecieved;
-        public SerialOpenEvent onSerialOpen;
-        public SerialCloseEvent onSerialClose;
-        public string inputLine;
-
-
-        int _readTimeout = 200;
-        int _writeTimeout = 2000;
         string _availableSerialPorts;
         SerialPort _serialPort;
 
         Coroutine readRoutine;
 
-        List<int> readLineBuffer = new List<int>();
-
-        public bool isOpen { get; private set; } = false;
+    
 
         public string portName
         {
@@ -71,7 +49,7 @@ namespace UGS
                     _serialPort.PortName = _portName;
                 }
 
-                if (autoCycle) Cycle();
+                if (isOpen) Close();
             }
         }
 
@@ -89,7 +67,7 @@ namespace UGS
                     _serialPort.BaudRate = _baudRate;
                 }
 
-                if (autoCycle) Cycle();
+                if (isOpen) Close();
             }
         }
 
@@ -107,7 +85,7 @@ namespace UGS
                     _serialPort.DataBits = _dataBits;
                 }
 
-                if (autoCycle) Cycle();
+                if (isOpen) Close();
             }
         }
 
@@ -125,7 +103,7 @@ namespace UGS
                     _serialPort.StopBits = _stopBits;
                 }
 
-                if (autoCycle) Cycle();
+                if (isOpen) Close();
             }
         }
 
@@ -142,27 +120,12 @@ namespace UGS
                 {
                     _serialPort.Parity = _parity;
                 }
-                if (autoCycle) Cycle();
+
+                if (isOpen) Close();
             }
         }
 
-        void Start()
-        {
-            if (autoCycle)
-            {
-                Debug.Log("UGS: If Auto Cycle is enabled, the port will close and attempt to re-open whenever a propery is changed through a script. If a property is changed in inspector, the port must be cycled manually.");
-            }
-
-
-
-            Debug.Log("Available serial ports: " + string.Join(",", SerialPort.GetPortNames()));
-        }
-
-        private void Update() {
-
-        }
-
-        public void Flush()
+        public override void Flush()
         {
             if (_serialPort != null)
             {
@@ -171,10 +134,10 @@ namespace UGS
             }
         }
 
-        public bool Open()
+        public override void Open()
         {
             // Don't try to open a port if this Connection is already open
-            if (isOpen) return false;
+            if (isOpen) return;
 
             try
             {
@@ -184,41 +147,39 @@ namespace UGS
                 _serialPort.WriteTimeout = _writeTimeout;
                 isOpen = true;
                 readRoutine = StartCoroutine(Read());
-                onSerialOpen.Invoke();
-                return true;
+                onOpen.Invoke();
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("UGS: Failed to Open Port");
-                Debug.LogError(e.Message);
+                Debug.LogWarningFormat("[UGS] Failed to Open Port");
+                Debug.LogWarning(e.Message);
                 isOpen = false;
-                return false;
             }
         }
 
         void CreateSerialPort()
         {
             string formattedPort = FormatPortName(_portName);
-            Debug.Log("UGS: Opening port: " + formattedPort);
+            Debug.Log("[UGS] Opening port: " + formattedPort);
             if (Array.IndexOf(SerialPort.GetPortNames(), _portName) == -1)
             {
-                throw new Exception("UGS: Serial port " + _portName + " (" + formattedPort + ") is not available.");
+                throw new Exception("[UGS] Serial port " + _portName + " (" + formattedPort + ") is not available.");
             }
-            Debug.Log(_baudRate);
             _serialPort = new SerialPort(formattedPort, _baudRate, _parity, _dataBits, _stopBits);
+            Debug.Log("[UGS] Port " + formattedPort + " opened.");
         }
 
         static string FormatPortName(string name)
         {
             string formattedPort = name;
 
-#if UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
+#if UNITY_STANDALONE_WIN
             formattedPort = "\\\\\\\\.\\\\" + name;
 #endif
             return formattedPort;
         }
 
-        public IEnumerator Read()
+        protected override IEnumerator Read()
         {
 
             while (isOpen)
@@ -234,7 +195,7 @@ namespace UGS
 
                         data += c;
 
-                        if (b == SerialConstants.CARRIAGE_RETURN || b == SerialConstants.LINE_FEED)
+                        if (b == Constants.CARRIAGE_RETURN || b == Constants.LINE_FEED)
                         {
                             // End of line, parse int array and send
                             if (readLineBuffer.Count > 0)
@@ -246,7 +207,7 @@ namespace UGS
                                 }
                                 readLineBuffer = new List<int>();
                                 onLineRecieved.Invoke(line);
-                                inputLine = line;
+                                _inputLine = line;
                             }
                         }
                         else
@@ -262,11 +223,11 @@ namespace UGS
                 }
                 catch (TimeoutException)
                 {
-                    Debug.LogError("UGS: Read timed out");
+                    Debug.LogError("[UGS] Read timed out");
                 }
                 catch (InvalidOperationException)
                 {
-                    Debug.LogError("UGS: The port is not open");
+                    Debug.LogError("[UGS] The port is not open");
                 }
 
                 if (waitFor == WaitFor.EndOfFrame)
@@ -287,7 +248,7 @@ namespace UGS
 
         }
 
-        public void Write(byte[] data)
+        void WriteSerial(byte[] data)
         {
             Debug.Log("writing: " + (char)data[0]);
             if (_serialPort != null && _serialPort.IsOpen)
@@ -298,35 +259,34 @@ namespace UGS
                 }
                 catch (TimeoutException)
                 {
-                    Debug.LogError("UGS: Write timed out");
+                    Debug.LogError("[UGS] Write timed out");
                 }
             }
         }
 
-        public void WriteLine(string s)
+        public override void Write(string writeString) {
+            byte[] bytes = Encoding.ASCII.GetBytes(writeString);
+            WriteSerial(bytes);
+        }
+
+        public override void WriteLine(string writeString)
         {
 
             if (_serialPort != null && _serialPort.IsOpen)
             {
                 try
                 {
-                    Debug.Log("Sending: " + s);
-                    _serialPort.WriteLine(s);
+                    _serialPort.WriteLine(writeString);
                 }
                 catch (TimeoutException)
                 {
-                    Debug.LogError("UGS: Write timed out");
+                    Debug.LogError("[UGS] Write timed out");
                 }
             }
 
         }
 
-        void OnApplicationQuit()
-        {
-            Close();
-        }
-
-        public void Close()
+        public override void Close()
         {
             if (_serialPort != null && _serialPort.IsOpen)
             {
@@ -334,20 +294,9 @@ namespace UGS
                 _serialPort.Close();
                 _serialPort = null;
                 isOpen = false;
-                onSerialClose.Invoke();
+                onClose.Invoke();
             }
         }
-
-        public void Cycle()
-        {
-            if (_serialPort != null && _serialPort.IsOpen)
-            {
-                Close();
-                _serialPort = null;
-                Open();
-            }
-        }
-
     }
-
 }
+#endif

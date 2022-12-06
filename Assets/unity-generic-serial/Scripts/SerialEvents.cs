@@ -8,15 +8,15 @@ Author: Brandon Matthews
 using UnityEngine.Events;
 using System;
 
-namespace UGS
+namespace Connectivity
 {
     [System.Serializable]
-    public class SerialDataEvent : UnityEvent<string> { }
+    public class DataEvent : UnityEvent<string> { }
     [System.Serializable]
-    public class SerialCharEvent : UnityEvent<char> { }
+    public class CharEvent : UnityEvent<char> { }
     [System.Serializable]
-    public class SerialOpenEvent : UnityEvent { }
+    public class OpenEvent : UnityEvent { }
     [System.Serializable]
-    public class SerialCloseEvent : UnityEvent { }
+    public class CloseEvent : UnityEvent { }
 }
 
